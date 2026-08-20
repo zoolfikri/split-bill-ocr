@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Bill {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  imageUrl  String?
+  tax       Decimal  @default(0) @db.Decimal(10, 2)
+  service   Decimal  @default(0) @db.Decimal(10, 2)
+  total     Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+
+  items   Item[]
+  people  Person[]
+}
+
+model Item {
+  id       String   @id @default(cuid())
+  billId   String
+  bill     Bill     @relation(fields: [billId], references: [id], onDelete: Cascade)
+  name     String
+  price    Decimal  @db.Decimal(10, 2)
+
+  assignments ItemAssignment[]
+}
+
+model Person {
+  id     String @id @default(cuid())
+  billId String
+  bill   Bill   @relation(fields: [billId], references: [id], onDelete: Cascade)
+  name   String
+
+  assignments ItemAssignment[]
+}
+
+model ItemAssignment {
+  itemId   String
+  item     Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  personId String
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, personId])
+}
+
+// ponytail: one counter for the whole app, no per-user tracking since there's
+// no auth. Swap for a per-IP or per-user table if the shared cap turns out too coarse.
+model OcrUsage {
+  day   String @id // "YYYY-MM-DD" (UTC)
+  count Int    @default(0)
+}
