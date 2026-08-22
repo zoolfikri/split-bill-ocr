@@ -144,19 +144,33 @@ export default function Home() {
         {step === "upload" && (
           <div className="space-y-4">
             <p className="text-muted">Upload a photo of your receipt to get started.</p>
-            <label className="flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border p-6 text-center active:bg-surface">
-              <span className="text-4xl">🧾</span>
-              <span className="font-medium">{loading ? "Reading receipt…" : "Tap to choose a photo"}</span>
-              <span className="text-sm text-muted">or take one with your camera</span>
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                disabled={loading}
-                onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
-                className="hidden"
-              />
-            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border p-6 text-center active:bg-surface">
+                <span className="text-4xl">🖼️</span>
+                <span className="font-medium">{loading ? "Reading receipt…" : "Choose photo"}</span>
+                <span className="text-sm text-muted">from your gallery</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={loading}
+                  onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
+                  className="hidden"
+                />
+              </label>
+              <label className="flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border p-6 text-center active:bg-surface">
+                <span className="text-4xl">📷</span>
+                <span className="font-medium">{loading ? "Reading receipt…" : "Take photo"}</span>
+                <span className="text-sm text-muted">with your camera</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  disabled={loading}
+                  onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
+                  className="hidden"
+                />
+              </label>
+            </div>
           </div>
         )}
 
