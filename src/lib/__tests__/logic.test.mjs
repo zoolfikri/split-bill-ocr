@@ -75,6 +75,25 @@ import { parseReceiptText } from "../receiptParser.ts";
   assert.strictEqual(parsed.total, 447350);
 }
 
+// parseReceiptText: "Subtotal" glued together with no colon (common OCR output) must be
+// dropped, not leaked into items or mistaken for the grand total.
+{
+  const text = [
+    "Nasi Goreng 42.000",
+    "Es Teh 8.000",
+    "Subtotal 50.000",
+    "PB1 5.000",
+    "Grand Total 55.000",
+  ].join("\n");
+  const parsed = parseReceiptText(text);
+  assert.deepStrictEqual(parsed.items, [
+    { name: "Nasi Goreng", price: 42000 },
+    { name: "Es Teh", price: 8000 },
+  ]);
+  assert.strictEqual(parsed.tax, 5000);
+  assert.strictEqual(parsed.total, 55000);
+}
+
 // calculateSplit: shared item splits evenly, tax/service prorated by subtotal share
 {
   const items = [
