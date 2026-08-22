@@ -59,8 +59,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: visionJson.responses[0].error.message }, { status: 502 });
     }
 
-    const parsed = (await parseReceiptWithLlm(text)) ?? parseReceiptText(text);
-    return NextResponse.json({ ...parsed, imageUrl: blob.url });
+    const llmParsed = await parseReceiptWithLlm(text);
+    const parsed = llmParsed ?? parseReceiptText(text);
+    return NextResponse.json({ ...parsed, imageUrl: blob.url, parsedBy: llmParsed ? "llm" : "regex" });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "OCR processing failed";
     return NextResponse.json({ error: message }, { status: 500 });

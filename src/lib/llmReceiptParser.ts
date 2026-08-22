@@ -52,10 +52,15 @@ function extractJson(content: string): unknown {
 
 // Best-effort structured extraction via an LLM. Returns null (never throws) on any
 // failure — missing key, network error, bad JSON, wrong shape — so callers can fall
-// back to the regex-based parseReceiptText.
+// back to the regex-based parseReceiptText. Failures are logged (not thrown) so they
+// show up in Vercel's runtime logs instead of failing silently.
 export async function parseReceiptWithLlm(text: string): Promise<ParsedReceipt | null> {
   const apiKey = process.env.NINE_ROUTER_API_KEY;
-  if (!apiKey || !text.trim()) return null;
+  if (!apiKey) {
+    console.warn("[llmReceiptParser] NINE_ROUTER_API_KEY not set, skipping LLM parse");
+    return null;
+  }
+  if (!text.trim()) return null;
 
   try {
     const controller = new AbortController();
@@ -78,15 +83,26 @@ export async function parseReceiptWithLlm(text: string): Promise<ParsedReceipt |
       signal: controller.signal,
     }).finally(() => clearTimeout(timeout));
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error("[llmReceiptParser] request failed", res.status, await res.text());
+      return null;
+    }
 
     const json = await res.json();
     const content: unknown = json.choices?.[0]?.message?.content;
-    if (typeof content !== "string") return null;
+    if (typeof content !== "string") {
+      console.error("[llmReceiptParser] no message content in response", JSON.stringify(json));
+      return null;
+    }
 
     const parsed = extractJson(content);
-    return isValidParsedReceipt(parsed) ? parsed : null;
-  } catch {
+    if (!isValidParsedReceipt(parsed)) {
+      console.error("[llmReceiptParser] response failed shape validation", JSON.stringify(parsed));
+      return null;
+    }
+    return parsed;
+  } catch (error) {
+    console.error("[llmReceiptParser] threw", error instanceof Error ? error.message : error);
     return null;
   }
 }
