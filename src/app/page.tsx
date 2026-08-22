@@ -29,6 +29,7 @@ export default function Home() {
   const [total, setTotal] = useState(0);
   const [people, setPeople] = useState<Person[]>([]);
   const [newPersonName, setNewPersonName] = useState("");
+  const [parsedBy, setParsedBy] = useState<string | undefined>();
 
   async function handleUpload(file: File) {
     setLoading(true);
@@ -44,6 +45,7 @@ export default function Home() {
       setTax(data.tax);
       setService(data.service);
       setTotal(data.total);
+      setParsedBy(data.parsedBy);
       setStep("review");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
@@ -177,6 +179,11 @@ export default function Home() {
         {step === "review" && (
           <div className="space-y-4">
             <h2 className="font-semibold">Check the detected items</h2>
+            {parsedBy && (
+              <p className="text-xs text-muted">
+                Parsed via {parsedBy === "llm" ? "AI (LLM)" : "regex fallback"}
+              </p>
+            )}
             <div className="space-y-2">
               {items.map((item) => (
                 <div key={item.id} className="flex items-center gap-2">
