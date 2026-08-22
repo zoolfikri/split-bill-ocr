@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { parseReceiptText } from "@/lib/receiptParser";
+import { parseReceiptWithLlm } from "@/lib/llmReceiptParser";
 import { consumeDailyOcrQuota, DAILY_OCR_LIMIT } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: visionJson.responses[0].error.message }, { status: 502 });
     }
 
-    const parsed = parseReceiptText(text);
+    const parsed = (await parseReceiptWithLlm(text)) ?? parseReceiptText(text);
     return NextResponse.json({ ...parsed, imageUrl: blob.url });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "OCR processing failed";

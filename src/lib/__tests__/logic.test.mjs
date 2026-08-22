@@ -94,6 +94,39 @@ import { parseReceiptText } from "../receiptParser.ts";
   assert.strictEqual(parsed.total, 55000);
 }
 
+// parseReceiptText: "<qty> x" on the price line (name on the previous line) must keep
+// the real name, not "1 x"/"66 x", and must multiply the unit price by the quantity.
+{
+  const text = [
+    "1 Jam Weekend",
+    "1 x 40.000",
+    "Time : 21:27 - 22:27",
+    "Duration: 01:00",
+    "Banana Milk",
+    "1 x 20.000",
+    "Mineral Water",
+    "1 x 10.000",
+    "Open Timer",
+    "66 x 666",
+    "Time : 22:31 - 23:37",
+    "Duration(Happy Hour): 01:06",
+    "Subtotal",
+    "113.956",
+    "Pembulatan",
+    "44",
+    "Total",
+    "114.000",
+  ].join("\n");
+  const parsed = parseReceiptText(text);
+  assert.deepStrictEqual(parsed.items, [
+    { name: "1 Jam Weekend", price: 40000 },
+    { name: "Banana Milk", price: 20000 },
+    { name: "Mineral Water", price: 10000 },
+    { name: "Open Timer", price: 43956 },
+  ]);
+  assert.strictEqual(parsed.total, 114000);
+}
+
 // calculateSplit: shared item splits evenly, tax/service prorated by subtotal share
 {
   const items = [

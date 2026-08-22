@@ -17,6 +17,11 @@ const MIN_PRICE = 100; // filters out quantities/table numbers ("1", "39") that 
 // fall through the "total" keyword match and get pushed onto items as a phantom line.
 const SUBTOTAL_RE = /\bsub[\s-]*total\b/;
 
+// A bare "<qty> x" (or "×") with nothing else — the name lives on the previous line
+// ("Open Timer" / "66 x 666"), and the trailing number is a unit price that needs
+// multiplying by the quantity, not the price itself.
+const QTY_RE = /^(\d+)\s*[x×]$/i;
+
 const KEYWORD_ORDER: { pattern: RegExp; field: keyof Omit<ParsedReceipt, "items"> }[] = [
   { pattern: /\bgrand\s*total\b/, field: "total" },
   { pattern: /\b(tax|vat|ppn|pb1)\b/, field: "tax" },
@@ -62,9 +67,11 @@ export function parseReceiptText(text: string): ParsedReceipt {
       continue;
     }
 
-    const price = toNumber(priceMatch[1]);
+    const unitPrice = toNumber(priceMatch[1]);
     const inlineLabel = line.slice(0, priceMatch.index).trim().replace(/[:\-.]+$/, "");
-    const label = (inlineLabel || pendingLabel).replace(/[:\-.]+$/, "").trim();
+    const qtyMatch = inlineLabel.match(QTY_RE);
+    const price = qtyMatch ? unitPrice * Number(qtyMatch[1]) : unitPrice;
+    const label = ((qtyMatch ? "" : inlineLabel) || pendingLabel).replace(/[:\-.]+$/, "").trim();
     pendingLabel = "";
 
     if (price < MIN_PRICE) continue;
