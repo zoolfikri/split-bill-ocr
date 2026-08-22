@@ -12,6 +12,11 @@ export type ParsedReceipt = {
 const PRICE_RE = /(?:^|\s)(\d{1,3}(?:[.,]\d{3})+|\d+)\s*$/;
 const MIN_PRICE = 100; // filters out quantities/table numbers ("1", "39") that aren't real prices
 
+// Matches "Subtotal", "Sub Total", "Sub-Total" etc. Checked before KEYWORD_ORDER because
+// "Subtotal" (glued, no space) has no word boundary before "total" and would otherwise
+// fall through the "total" keyword match and get pushed onto items as a phantom line.
+const SUBTOTAL_RE = /\bsub[\s-]*total\b/;
+
 const KEYWORD_ORDER: { pattern: RegExp; field: keyof Omit<ParsedReceipt, "items"> }[] = [
   { pattern: /\bgrand\s*total\b/, field: "total" },
   { pattern: /\b(tax|vat|ppn|pb1)\b/, field: "tax" },
@@ -63,6 +68,10 @@ export function parseReceiptText(text: string): ParsedReceipt {
     pendingLabel = "";
 
     if (price < MIN_PRICE) continue;
+
+    // Subtotal is neither a line item nor the grand total (it's the pre-tax/service sum) —
+    // drop it so it doesn't leak into items or get mistaken for the total.
+    if (SUBTOTAL_RE.test(label.toLowerCase()) || SUBTOTAL_RE.test(line.toLowerCase())) continue;
 
     const keywordField = matchKeyword(label) ?? matchKeyword(line);
     if (keywordField) {
