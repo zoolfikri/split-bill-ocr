@@ -7,7 +7,7 @@ type Item = { id: string; name: string; price: number; personIds: string[] };
 type Person = { id: string; name: string };
 type Step = "upload" | "review" | "people" | "assign";
 
-type Draft = {
+type BillState = {
   step: Step;
   imageUrl?: string;
   items: Item[];
@@ -22,6 +22,18 @@ type Draft = {
 const DRAFT_KEY = "split-bill-draft";
 const uid = () => Math.random().toString(36).slice(2, 10);
 
+const INITIAL_BILL: BillState = {
+  step: "upload",
+  imageUrl: undefined,
+  items: [],
+  tax: 0,
+  service: 0,
+  total: 0,
+  people: [],
+  parsedBy: undefined,
+  ocrText: "",
+};
+
 const STEPS: { id: Step; label: string }[] = [
   { id: "upload", label: "Scan" },
   { id: "review", label: "Review" },
@@ -29,115 +41,116 @@ const STEPS: { id: Step; label: string }[] = [
   { id: "assign", label: "Split" },
 ];
 
+// Reads an in-progress bill left over from a page reload/close before saving.
+function readDraft(): BillState | undefined {
+  const raw = localStorage.getItem(DRAFT_KEY);
+  if (!raw) return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    localStorage.removeItem(DRAFT_KEY);
+    return undefined;
+  }
+}
+
 export default function Home() {
   const router = useRouter();
-  const [step, setStep] = useState<Step>("upload");
+  const [bill, setBill] = useState<BillState>(INITIAL_BILL);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const [imageUrl, setImageUrl] = useState<string | undefined>();
-  const [items, setItems] = useState<Item[]>([]);
-  const [tax, setTax] = useState(0);
-  const [service, setService] = useState(0);
-  const [total, setTotal] = useState(0);
-  const [people, setPeople] = useState<Person[]>([]);
   const [newPersonName, setNewPersonName] = useState("");
-  const [parsedBy, setParsedBy] = useState<string | undefined>();
-  const [ocrText, setOcrText] = useState("");
+  const [previewUrl, setPreviewUrl] = useState<string | undefined>();
+  const { step, imageUrl, items, tax, service, total, people, parsedBy, ocrText } = bill;
 
-  // Restore an in-progress bill left over from a page reload/close before saving.
+  function updateBill(patch: Partial<BillState>) {
+    setBill((prev) => ({ ...prev, ...patch }));
+  }
+
+  // Restore a draft after mount only — matching the server-rendered (empty) HTML on
+  // first paint keeps hydration consistent, since localStorage isn't available server-side.
+  // Restoring from localStorage (an external system) is deliberately deferred to after
+  // mount, so the first client render matches the server-rendered HTML instead of causing
+  // a hydration mismatch.
   useEffect(() => {
-    const raw = localStorage.getItem(DRAFT_KEY);
-    if (!raw) return;
-    try {
-      const draft: Draft = JSON.parse(raw);
-      setStep(draft.step);
-      setImageUrl(draft.imageUrl);
-      setItems(draft.items);
-      setTax(draft.tax);
-      setService(draft.service);
-      setTotal(draft.total);
-      setPeople(draft.people);
-      setParsedBy(draft.parsedBy);
-      setOcrText(draft.ocrText);
-    } catch {
-      localStorage.removeItem(DRAFT_KEY);
+    const draft = readDraft();
+    if (draft) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above
+      setBill(draft);
     }
   }, []);
 
   // Persist every change so users don't lose the extraction by leaving the page.
   useEffect(() => {
     if (step === "upload" && items.length === 0) return;
-    const draft: Draft = { step, imageUrl, items, tax, service, total, people, parsedBy, ocrText };
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-  }, [step, imageUrl, items, tax, service, total, people, parsedBy, ocrText]);
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(bill));
+  }, [bill, step, items.length]);
 
   function startNew() {
     localStorage.removeItem(DRAFT_KEY);
-    setStep("upload");
-    setImageUrl(undefined);
-    setItems([]);
-    setTax(0);
-    setService(0);
-    setTotal(0);
-    setPeople([]);
+    setBill(INITIAL_BILL);
     setNewPersonName("");
-    setParsedBy(undefined);
-    setOcrText("");
     setError("");
   }
 
   async function handleUpload(file: File) {
     setLoading(true);
     setError("");
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
     try {
       const form = new FormData();
       form.append("file", file);
       const res = await fetch("/api/ocr", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "OCR failed");
-      setImageUrl(data.imageUrl);
-      setItems(data.items.map((i: { name: string; price: number }) => ({ ...i, id: uid(), personIds: [] })));
-      setTax(data.tax);
-      setService(data.service);
-      setTotal(data.total);
-      setParsedBy(data.parsedBy);
-      setOcrText(data.ocrText ?? "");
-      setStep("review");
+      updateBill({
+        step: "review",
+        imageUrl: data.imageUrl,
+        items: data.items.map((i: { name: string; price: number }) => ({ ...i, id: uid(), personIds: [] })),
+        tax: data.tax,
+        service: data.service,
+        total: data.total,
+        parsedBy: data.parsedBy,
+        ocrText: data.ocrText ?? "",
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
+      setPreviewUrl(undefined);
     } finally {
       setLoading(false);
+      URL.revokeObjectURL(objectUrl);
     }
   }
 
   function updateItem(id: string, patch: Partial<Item>) {
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+    updateBill({ items: items.map((i) => (i.id === id ? { ...i, ...patch } : i)) });
   }
 
   function removeItem(id: string) {
-    setItems((prev) => prev.filter((i) => i.id !== id));
+    updateBill({ items: items.filter((i) => i.id !== id) });
   }
 
   function addItem() {
-    setItems((prev) => [...prev, { id: uid(), name: "", price: 0, personIds: [] }]);
+    updateBill({ items: [...items, { id: uid(), name: "", price: 0, personIds: [] }] });
   }
 
   function addPerson() {
     const name = newPersonName.trim();
     if (!name) return;
-    setPeople((prev) => [...prev, { id: uid(), name }]);
+    updateBill({ people: [...people, { id: uid(), name }] });
     setNewPersonName("");
   }
 
   function removePerson(id: string) {
-    setPeople((prev) => prev.filter((p) => p.id !== id));
-    setItems((prev) => prev.map((i) => ({ ...i, personIds: i.personIds.filter((pid) => pid !== id) })));
+    updateBill({
+      people: people.filter((p) => p.id !== id),
+      items: items.map((i) => ({ ...i, personIds: i.personIds.filter((pid) => pid !== id) })),
+    });
   }
 
   function toggleAssignment(itemId: string, personId: string) {
-    setItems((prev) =>
-      prev.map((i) =>
+    updateBill({
+      items: items.map((i) =>
         i.id === itemId
           ? {
               ...i,
@@ -146,8 +159,8 @@ export default function Home() {
                 : [...i.personIds, personId],
             }
           : i
-      )
-    );
+      ),
+    });
   }
 
   async function handleSave() {
@@ -181,24 +194,61 @@ export default function Home() {
       <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto max-w-2xl px-4 py-3">
           <div className="flex items-center justify-between">
-            <h1 className="text-lg font-bold">Split Bill OCR</h1>
+            <h1 className="flex items-center gap-2 font-ticket text-lg font-bold tracking-tight">
+              <svg viewBox="0 0 64 64" className="h-7 w-7 shrink-0" aria-hidden="true">
+                <rect width="64" height="64" rx="14" fill="var(--foreground)" />
+                <path
+                  d="M18 10 H46 V40 L42 44 L38 40 L34 44 L30 40 L26 44 L22 40 L18 44 Z"
+                  fill="var(--background)"
+                />
+                <line x1="22" y1="18" x2="38" y2="18" stroke="var(--muted)" strokeWidth="2.2" strokeLinecap="round" />
+                <line x1="22" y1="24" x2="42" y2="24" stroke="var(--muted)" strokeWidth="2.2" strokeLinecap="round" />
+                <line x1="22" y1="30" x2="34" y2="30" stroke="var(--muted)" strokeWidth="2.2" strokeLinecap="round" />
+                <circle cx="46" cy="45" r="10" fill="var(--accent)" stroke="var(--foreground)" strokeWidth="2" />
+                <path
+                  d="M41.5 45 L44.5 48 L50.5 41.5"
+                  fill="none"
+                  stroke="var(--accent-foreground)"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Split Bill
+            </h1>
             {step !== "upload" && (
-              <button onClick={startNew} className="text-sm text-muted underline">
+              <button
+                onClick={startNew}
+                className="min-h-8 rounded-full border border-border px-3 text-xs font-medium text-muted active:bg-surface"
+              >
                 New
               </button>
             )}
           </div>
-          <ol className="mt-2 flex items-center gap-2">
+          <ol className="mt-3 flex items-center">
             {STEPS.map((s, i) => (
-              <li key={s.id} className="flex flex-1 items-center gap-2">
-                <div
-                  className={`h-1.5 flex-1 rounded-full transition-colors ${
-                    i <= stepIndex ? "bg-accent" : "bg-border"
-                  }`}
-                />
-                <span className={`hidden text-xs sm:inline ${i === stepIndex ? "font-semibold" : "text-muted"}`}>
-                  {s.label}
-                </span>
+              <li key={s.id} className="flex flex-1 items-center last:flex-none">
+                <div className="flex flex-col items-center gap-1">
+                  <span
+                    className={`font-ticket flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold transition-colors ${
+                      i <= stepIndex
+                        ? "border-accent bg-accent text-accent-foreground"
+                        : "border-border text-muted"
+                    }`}
+                  >
+                    {i + 1}
+                  </span>
+                  <span className={`hidden text-[10px] sm:inline ${i === stepIndex ? "font-semibold" : "text-muted"}`}>
+                    {s.label}
+                  </span>
+                </div>
+                {i < STEPS.length - 1 && (
+                  <div
+                    className={`mx-1.5 mb-4 h-px flex-1 border-t-2 border-dotted transition-colors sm:mb-3.5 ${
+                      i < stepIndex ? "border-accent" : "border-border"
+                    }`}
+                  />
+                )}
               </li>
             ))}
           </ol>
@@ -209,35 +259,55 @@ export default function Home() {
         {error && <p className="rounded-lg bg-red-100 p-3 text-sm text-red-700">{error}</p>}
 
         {step === "upload" && (
-          <div className="space-y-4">
-            <p className="text-muted">Upload a photo of your receipt to get started.</p>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border p-6 text-center active:bg-surface">
-                <span className="text-4xl">🖼️</span>
-                <span className="font-medium">{loading ? "Reading receipt…" : "Choose photo"}</span>
-                <span className="text-sm text-muted">from your gallery</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  disabled={loading}
-                  onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
-                  className="hidden"
-                />
-              </label>
-              <label className="flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border p-6 text-center active:bg-surface">
-                <span className="text-4xl">📷</span>
-                <span className="font-medium">{loading ? "Reading receipt…" : "Take photo"}</span>
-                <span className="text-sm text-muted">with your camera</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  disabled={loading}
-                  onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
-                  className="hidden"
-                />
-              </label>
+          <div className="space-y-5 pt-6 text-center">
+            <div className="space-y-1">
+              <p className="font-ticket text-xs uppercase tracking-[0.2em] text-muted">
+                {loading ? "Scanning" : "Ready to scan"}
+              </p>
+              <p className="text-muted">
+                {loading ? "Reading your receipt with AI…" : "Feed in a receipt and I'll pull out the items."}
+              </p>
             </div>
+
+            {loading && previewUrl ? (
+              <div className="scan-frame relative mx-auto aspect-[3/4] w-full max-w-xs overflow-hidden rounded-2xl border border-accent/50 shadow-sm">
+                {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview, not a remote image */}
+                <img src={previewUrl} alt="Selected receipt" className="h-full w-full object-cover" />
+                <div className="scan-overlay" />
+                <span className="absolute left-2 top-2 h-6 w-6 rounded-tl-md border-l-2 border-t-2 border-accent" />
+                <span className="absolute right-2 top-2 h-6 w-6 rounded-tr-md border-r-2 border-t-2 border-accent" />
+                <span className="absolute bottom-2 left-2 h-6 w-6 rounded-bl-md border-b-2 border-l-2 border-accent" />
+                <span className="absolute bottom-2 right-2 h-6 w-6 rounded-br-md border-b-2 border-r-2 border-accent" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <label className="relative flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border-2 border-dashed border-border p-6 text-center active:bg-surface">
+                  <span className="text-4xl">🖼️</span>
+                  <span className="font-medium">Choose photo</span>
+                  <span className="text-sm text-muted">from your gallery</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={loading}
+                    onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
+                    className="hidden"
+                  />
+                </label>
+                <label className="relative flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border-2 border-dashed border-border p-6 text-center active:bg-surface">
+                  <span className="text-4xl">📷</span>
+                  <span className="font-medium">Take photo</span>
+                  <span className="text-sm text-muted">with your camera</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    disabled={loading}
+                    onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            )}
           </div>
         )}
 
@@ -270,7 +340,7 @@ export default function Home() {
                     type="number"
                     inputMode="decimal"
                     step="0.01"
-                    className="min-h-11 w-24 rounded-lg border border-border bg-surface px-3 py-2"
+                    className="font-ticket min-h-11 w-24 rounded-lg border border-border bg-surface px-3 py-2 text-right"
                     value={item.price}
                     onChange={(e) => updateItem(item.id, { price: parseFloat(e.target.value) || 0 })}
                   />
@@ -286,7 +356,7 @@ export default function Home() {
             </div>
             <button
               onClick={addItem}
-              className="min-h-11 rounded-lg border border-border px-4 text-sm active:bg-surface"
+              className="min-h-11 rounded-full border border-border px-4 text-sm active:bg-surface"
             >
               + Add item
             </button>
@@ -300,7 +370,7 @@ export default function Home() {
                   step="0.01"
                   className="mt-1 block min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2"
                   value={tax}
-                  onChange={(e) => setTax(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => updateBill({ tax: parseFloat(e.target.value) || 0 })}
                 />
               </label>
               <label className="text-sm">
@@ -311,7 +381,7 @@ export default function Home() {
                   step="0.01"
                   className="mt-1 block min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2"
                   value={service}
-                  onChange={(e) => setService(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => updateBill({ service: parseFloat(e.target.value) || 0 })}
                 />
               </label>
               <label className="text-sm">
@@ -322,11 +392,15 @@ export default function Home() {
                   step="0.01"
                   className="mt-1 block min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2"
                   value={total}
-                  onChange={(e) => setTotal(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => updateBill({ total: parseFloat(e.target.value) || 0 })}
                 />
               </label>
             </div>
-            <p className="text-sm text-muted">Items subtotal: {itemsSubtotal.toFixed(2)}</p>
+            <p className="flex items-baseline gap-2 text-sm text-muted">
+              Items subtotal
+              <span className="leader" />
+              <span className="font-ticket text-foreground">{itemsSubtotal.toFixed(2)}</span>
+            </p>
 
             {Math.abs(totalMismatch) > 0.01 && (
               <p className="rounded-lg bg-amber-100 p-3 text-sm text-amber-800">
@@ -351,7 +425,7 @@ export default function Home() {
               />
               <button
                 onClick={addPerson}
-                className="min-h-11 rounded-lg border border-border px-4 active:bg-surface"
+                className="min-h-11 rounded-full border border-border px-4 active:bg-surface"
               >
                 Add
               </button>
@@ -383,9 +457,10 @@ export default function Home() {
             <div className="space-y-3">
               {items.map((item) => (
                 <div key={item.id} className="rounded-xl border border-border bg-surface p-3">
-                  <div className="flex justify-between gap-3 font-medium">
-                    <span className="min-w-0 break-words">{item.name || "(unnamed item)"}</span>
-                    <span className="shrink-0 tabular-nums">{item.price.toFixed(2)}</span>
+                  <div className="flex items-baseline gap-2 font-medium">
+                    <span className="min-w-0 shrink break-words">{item.name || "(unnamed item)"}</span>
+                    <span className="leader" />
+                    <span className="font-ticket shrink-0">{item.price.toFixed(2)}</span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {people.map((p) => (
@@ -424,9 +499,9 @@ export default function Home() {
         <div className="mx-auto flex max-w-2xl gap-3 p-4">
           {step === "review" && (
             <button
-              onClick={() => setStep("people")}
+              onClick={() => updateBill({ step: "people" })}
               disabled={items.length === 0}
-              className="min-h-12 flex-1 rounded-lg bg-accent font-medium text-accent-foreground disabled:opacity-40"
+              className="min-h-12 flex-1 rounded-full bg-accent font-medium text-accent-foreground shadow-sm active:brightness-95 disabled:opacity-40"
             >
               Next: add people
             </button>
@@ -434,15 +509,15 @@ export default function Home() {
           {step === "people" && (
             <>
               <button
-                onClick={() => setStep("review")}
-                className="min-h-12 flex-1 rounded-lg border border-border font-medium active:bg-surface"
+                onClick={() => updateBill({ step: "review" })}
+                className="min-h-12 flex-1 rounded-full border border-border font-medium active:bg-surface"
               >
                 Back
               </button>
               <button
-                onClick={() => setStep("assign")}
+                onClick={() => updateBill({ step: "assign" })}
                 disabled={people.length === 0}
-                className="min-h-12 flex-1 rounded-lg bg-accent font-medium text-accent-foreground disabled:opacity-40"
+                className="min-h-12 flex-1 rounded-full bg-accent font-medium text-accent-foreground shadow-sm active:brightness-95 disabled:opacity-40"
               >
                 Next: assign items
               </button>
@@ -451,15 +526,15 @@ export default function Home() {
           {step === "assign" && (
             <>
               <button
-                onClick={() => setStep("people")}
-                className="min-h-12 flex-1 rounded-lg border border-border font-medium active:bg-surface"
+                onClick={() => updateBill({ step: "people" })}
+                className="min-h-12 flex-1 rounded-full border border-border font-medium active:bg-surface"
               >
                 Back
               </button>
               <button
                 onClick={handleSave}
                 disabled={loading}
-                className="min-h-12 flex-1 rounded-lg bg-accent font-medium text-accent-foreground disabled:opacity-40"
+                className="min-h-12 flex-1 rounded-full bg-accent font-medium text-accent-foreground shadow-sm active:brightness-95 disabled:opacity-40"
               >
                 {loading ? "Saving…" : "Save & get share link"}
               </button>
