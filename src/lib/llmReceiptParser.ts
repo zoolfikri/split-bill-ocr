@@ -75,6 +75,7 @@ export async function parseReceiptWithLlm(text: string): Promise<ParsedReceipt |
       body: JSON.stringify({
         model: MODEL,
         temperature: 0,
+        stream: false,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: text },

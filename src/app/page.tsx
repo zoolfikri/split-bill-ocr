@@ -1,12 +1,25 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Item = { id: string; name: string; price: number; personIds: string[] };
 type Person = { id: string; name: string };
 type Step = "upload" | "review" | "people" | "assign";
 
+type Draft = {
+  step: Step;
+  imageUrl?: string;
+  items: Item[];
+  tax: number;
+  service: number;
+  total: number;
+  people: Person[];
+  parsedBy?: string;
+  ocrText: string;
+};
+
+const DRAFT_KEY = "split-bill-draft";
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 const STEPS: { id: Step; label: string }[] = [
@@ -30,6 +43,49 @@ export default function Home() {
   const [people, setPeople] = useState<Person[]>([]);
   const [newPersonName, setNewPersonName] = useState("");
   const [parsedBy, setParsedBy] = useState<string | undefined>();
+  const [ocrText, setOcrText] = useState("");
+
+  // Restore an in-progress bill left over from a page reload/close before saving.
+  useEffect(() => {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+    try {
+      const draft: Draft = JSON.parse(raw);
+      setStep(draft.step);
+      setImageUrl(draft.imageUrl);
+      setItems(draft.items);
+      setTax(draft.tax);
+      setService(draft.service);
+      setTotal(draft.total);
+      setPeople(draft.people);
+      setParsedBy(draft.parsedBy);
+      setOcrText(draft.ocrText);
+    } catch {
+      localStorage.removeItem(DRAFT_KEY);
+    }
+  }, []);
+
+  // Persist every change so users don't lose the extraction by leaving the page.
+  useEffect(() => {
+    if (step === "upload" && items.length === 0) return;
+    const draft: Draft = { step, imageUrl, items, tax, service, total, people, parsedBy, ocrText };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  }, [step, imageUrl, items, tax, service, total, people, parsedBy, ocrText]);
+
+  function startNew() {
+    localStorage.removeItem(DRAFT_KEY);
+    setStep("upload");
+    setImageUrl(undefined);
+    setItems([]);
+    setTax(0);
+    setService(0);
+    setTotal(0);
+    setPeople([]);
+    setNewPersonName("");
+    setParsedBy(undefined);
+    setOcrText("");
+    setError("");
+  }
 
   async function handleUpload(file: File) {
     setLoading(true);
@@ -46,6 +102,7 @@ export default function Home() {
       setService(data.service);
       setTotal(data.total);
       setParsedBy(data.parsedBy);
+      setOcrText(data.ocrText ?? "");
       setStep("review");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
@@ -104,6 +161,7 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Save failed");
+      localStorage.removeItem(DRAFT_KEY);
       router.push(`/bill/${data.slug}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
@@ -122,7 +180,14 @@ export default function Home() {
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto max-w-2xl px-4 py-3">
-          <h1 className="text-lg font-bold">Split Bill OCR</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-lg font-bold">Split Bill OCR</h1>
+            {step !== "upload" && (
+              <button onClick={startNew} className="text-sm text-muted underline">
+                New
+              </button>
+            )}
+          </div>
           <ol className="mt-2 flex items-center gap-2">
             {STEPS.map((s, i) => (
               <li key={s.id} className="flex flex-1 items-center gap-2">
@@ -183,6 +248,14 @@ export default function Home() {
               <p className="text-xs text-muted">
                 Parsed via {parsedBy === "llm" ? "AI (LLM)" : "regex fallback"}
               </p>
+            )}
+            {ocrText && (
+              <details className="text-xs text-muted">
+                <summary className="cursor-pointer select-none">Raw OCR text</summary>
+                <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-surface p-2">
+                  {ocrText}
+                </pre>
+              </details>
             )}
             <div className="space-y-2">
               {items.map((item) => (

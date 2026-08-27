@@ -61,7 +61,12 @@ export async function POST(req: NextRequest) {
 
     const llmParsed = await parseReceiptWithLlm(text);
     const parsed = llmParsed ?? parseReceiptText(text);
-    return NextResponse.json({ ...parsed, imageUrl: blob.url, parsedBy: llmParsed ? "llm" : "regex" });
+    return NextResponse.json({
+      ...parsed,
+      imageUrl: blob.url,
+      parsedBy: llmParsed ? "llm" : "regex",
+      ocrText: text,
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "OCR processing failed";
     return NextResponse.json({ error: message }, { status: 500 });
