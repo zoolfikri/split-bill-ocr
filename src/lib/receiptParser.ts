@@ -1,4 +1,4 @@
-export type ParsedItem = { name: string; price: number };
+export type ParsedItem = { name: string; price: number; qty: number };
 export type ParsedReceipt = {
   items: ParsedItem[];
   tax: number;
@@ -70,7 +70,8 @@ export function parseReceiptText(text: string): ParsedReceipt {
     const unitPrice = toNumber(priceMatch[1]);
     const inlineLabel = line.slice(0, priceMatch.index).trim().replace(/[:\-.]+$/, "");
     const qtyMatch = inlineLabel.match(QTY_RE);
-    const price = qtyMatch ? unitPrice * Number(qtyMatch[1]) : unitPrice;
+    const qty = qtyMatch ? Number(qtyMatch[1]) : 1;
+    const price = qtyMatch ? unitPrice * qty : unitPrice;
     const label = ((qtyMatch ? "" : inlineLabel) || pendingLabel).replace(/[:\-.]+$/, "").trim();
     pendingLabel = "";
 
@@ -89,7 +90,7 @@ export function parseReceiptText(text: string): ParsedReceipt {
     // Metadata rows ("No : RPG202608020090") aren't items even if the price looks real.
     if (!label || line.includes(":")) continue;
 
-    items.push({ name: label, price });
+    items.push({ name: label, price, qty });
   }
 
   return {

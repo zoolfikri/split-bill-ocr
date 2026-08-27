@@ -2,6 +2,10 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { calculateSplit } from "@/lib/splitCalculator";
 
+// "10.000" not "10000.00" — Indonesian Rupiah has no cents, and uses "." as the
+// thousands separator.
+const formatMoney = (n: number) => new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 }).format(n);
+
 export default async function BillPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
@@ -16,6 +20,7 @@ export default async function BillPage({ params }: { params: Promise<{ slug: str
     id: item.id,
     name: item.name,
     price: Number(item.price),
+    qty: item.qty,
     personIds: item.assignments.map((a) => a.personId),
   }));
 
@@ -27,7 +32,7 @@ export default async function BillPage({ params }: { params: Promise<{ slug: str
     <main className="mx-auto max-w-2xl space-y-8 p-4 pb-10 sm:p-6">
       <div className="space-y-1 text-center">
         <p className="font-ticket text-xs uppercase tracking-[0.2em] text-muted">🧾 Receipt split</p>
-        <h1 className="font-ticket text-2xl font-bold">{Number(bill.total).toFixed(2)}</h1>
+        <h1 className="font-ticket text-2xl font-bold">{formatMoney(Number(bill.total))}</h1>
       </div>
 
       <section className="space-y-3">
@@ -38,7 +43,7 @@ export default async function BillPage({ params }: { params: Promise<{ slug: str
               <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 marker:content-none">
                 <span className="min-w-0 break-words font-medium">{person.name}</span>
                 <span className="flex shrink-0 items-center gap-2">
-                  <span className="font-ticket text-lg font-bold text-accent">{person.total.toFixed(2)}</span>
+                  <span className="font-ticket text-lg font-bold text-accent">{formatMoney(person.total)}</span>
                   <span className="text-muted transition-transform group-open:rotate-180">⌄</span>
                 </span>
               </summary>
@@ -47,18 +52,18 @@ export default async function BillPage({ params }: { params: Promise<{ slug: str
                   <li key={idx} className="flex items-baseline gap-2">
                     <span className="min-w-0 shrink break-words">{i.name}</span>
                     <span className="leader" />
-                    <span className="font-ticket shrink-0">{i.share.toFixed(2)}</span>
+                    <span className="font-ticket shrink-0">{formatMoney(i.share)}</span>
                   </li>
                 ))}
                 <li className="flex items-baseline gap-2">
                   <span className="min-w-0 shrink break-words">Tax share</span>
                   <span className="leader" />
-                  <span className="font-ticket shrink-0">{person.taxShare.toFixed(2)}</span>
+                  <span className="font-ticket shrink-0">{formatMoney(person.taxShare)}</span>
                 </li>
                 <li className="flex items-baseline gap-2">
                   <span className="min-w-0 shrink break-words">Service share</span>
                   <span className="leader" />
-                  <span className="font-ticket shrink-0">{person.serviceShare.toFixed(2)}</span>
+                  <span className="font-ticket shrink-0">{formatMoney(person.serviceShare)}</span>
                 </li>
               </ul>
             </details>
@@ -74,9 +79,12 @@ export default async function BillPage({ params }: { params: Promise<{ slug: str
             <ul className="divide-y divide-dotted divide-border text-sm">
               {items.map((item) => (
                 <li key={item.id} className="flex items-baseline gap-2 py-2">
-                  <span className="min-w-0 shrink break-words">{item.name}</span>
+                  <span className="min-w-0 shrink break-words">
+                    {item.qty > 1 && <span className="font-ticket text-muted">{item.qty}× </span>}
+                    {item.name}
+                  </span>
                   <span className="leader" />
-                  <span className="font-ticket shrink-0">{item.price.toFixed(2)}</span>
+                  <span className="font-ticket shrink-0">{formatMoney(item.price)}</span>
                 </li>
               ))}
             </ul>
@@ -84,17 +92,17 @@ export default async function BillPage({ params }: { params: Promise<{ slug: str
               <div className="flex items-baseline gap-2">
                 <span>Tax</span>
                 <span className="leader" />
-                <span className="font-ticket shrink-0">{tax.toFixed(2)}</span>
+                <span className="font-ticket shrink-0">{formatMoney(tax)}</span>
               </div>
               <div className="flex items-baseline gap-2">
                 <span>Service</span>
                 <span className="leader" />
-                <span className="font-ticket shrink-0">{service.toFixed(2)}</span>
+                <span className="font-ticket shrink-0">{formatMoney(service)}</span>
               </div>
               <div className="flex items-baseline gap-2 text-base font-semibold text-foreground">
                 <span>Total</span>
                 <span className="leader" />
-                <span className="font-ticket shrink-0">{Number(bill.total).toFixed(2)}</span>
+                <span className="font-ticket shrink-0">{formatMoney(Number(bill.total))}</span>
               </div>
             </div>
           </div>

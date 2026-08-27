@@ -26,6 +26,7 @@ model Item {
   bill     Bill     @relation(fields: [billId], references: [id], onDelete: Cascade)
   name     String
   price    Decimal  @db.Decimal(10, 2)
+  qty      Int      @default(1)
 
   assignments ItemAssignment[]
 }

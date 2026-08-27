@@ -9,8 +9,8 @@ import { parseReceiptText } from "../receiptParser.ts";
   const text = ["Fried Rice 25000", "Iced Tea 8000", "Tax 3300", "Service 1650", "Total 37950"].join("\n");
   const parsed = parseReceiptText(text);
   assert.deepStrictEqual(parsed.items, [
-    { name: "Fried Rice", price: 25000 },
-    { name: "Iced Tea", price: 8000 },
+    { name: "Fried Rice", price: 25000, qty: 1 },
+    { name: "Iced Tea", price: 8000, qty: 1 },
   ]);
   assert.strictEqual(parsed.tax, 3300);
   assert.strictEqual(parsed.service, 1650);
@@ -22,8 +22,8 @@ import { parseReceiptText } from "../receiptParser.ts";
   const text = ["Nasi Goreng 42.000", "Es Teh 8.000", "Grand Total 50.000"].join("\n");
   const parsed = parseReceiptText(text);
   assert.deepStrictEqual(parsed.items, [
-    { name: "Nasi Goreng", price: 42000 },
-    { name: "Es Teh", price: 8000 },
+    { name: "Nasi Goreng", price: 42000, qty: 1 },
+    { name: "Es Teh", price: 8000, qty: 1 },
   ]);
   assert.strictEqual(parsed.total, 50000);
 }
@@ -46,8 +46,8 @@ import { parseReceiptText } from "../receiptParser.ts";
   ].join("\n");
   const parsed = parseReceiptText(text);
   assert.deepStrictEqual(parsed.items, [
-    { name: "Creamy Salted Egg Chicken Bowl", price: 42000 },
-    { name: "Telur Rebus Setengah Matang", price: 7000 },
+    { name: "Creamy Salted Egg Chicken Bowl", price: 42000, qty: 1 },
+    { name: "Telur Rebus Setengah Matang", price: 7000, qty: 1 },
   ]);
   assert.strictEqual(parsed.tax, 38900); // PB1
   assert.strictEqual(parsed.service, 19450);
@@ -69,7 +69,7 @@ import { parseReceiptText } from "../receiptParser.ts";
     ": 447.350",
   ].join("\n");
   const parsed = parseReceiptText(text);
-  assert.deepStrictEqual(parsed.items, [{ name: "Nasi Goreng", price: 42000 }]);
+  assert.deepStrictEqual(parsed.items, [{ name: "Nasi Goreng", price: 42000, qty: 1 }]);
   assert.strictEqual(parsed.service, 19450);
   assert.strictEqual(parsed.tax, 38900);
   assert.strictEqual(parsed.total, 447350);
@@ -87,15 +87,16 @@ import { parseReceiptText } from "../receiptParser.ts";
   ].join("\n");
   const parsed = parseReceiptText(text);
   assert.deepStrictEqual(parsed.items, [
-    { name: "Nasi Goreng", price: 42000 },
-    { name: "Es Teh", price: 8000 },
+    { name: "Nasi Goreng", price: 42000, qty: 1 },
+    { name: "Es Teh", price: 8000, qty: 1 },
   ]);
   assert.strictEqual(parsed.tax, 5000);
   assert.strictEqual(parsed.total, 55000);
 }
 
 // parseReceiptText: "<qty> x" on the price line (name on the previous line) must keep
-// the real name, not "1 x"/"66 x", and must multiply the unit price by the quantity.
+// the real name, not "1 x"/"66 x", must multiply the unit price by the quantity, and
+// must surface that quantity as "qty" (not just fold it into price).
 {
   const text = [
     "1 Jam Weekend",
@@ -119,10 +120,10 @@ import { parseReceiptText } from "../receiptParser.ts";
   ].join("\n");
   const parsed = parseReceiptText(text);
   assert.deepStrictEqual(parsed.items, [
-    { name: "1 Jam Weekend", price: 40000 },
-    { name: "Banana Milk", price: 20000 },
-    { name: "Mineral Water", price: 10000 },
-    { name: "Open Timer", price: 43956 },
+    { name: "1 Jam Weekend", price: 40000, qty: 1 },
+    { name: "Banana Milk", price: 20000, qty: 1 },
+    { name: "Mineral Water", price: 10000, qty: 1 },
+    { name: "Open Timer", price: 43956, qty: 66 },
   ]);
   assert.strictEqual(parsed.total, 114000);
 }

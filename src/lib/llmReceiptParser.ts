@@ -5,11 +5,12 @@ const MODEL = "kr/glm-5";
 
 const SYSTEM_PROMPT = `You extract structured data from OCR text of a restaurant/cafe receipt.
 Return ONLY a JSON object, no prose, no markdown fences, matching exactly this shape:
-{"items": [{"name": string, "price": number}], "tax": number, "service": number, "total": number}
+{"items": [{"name": string, "price": number, "qty": number}], "tax": number, "service": number, "total": number}
 
 Rules:
 - "items" excludes subtotal, tax, service charge, rounding, and the grand total — only actual purchased items/services.
-- If a line has "<qty> x <unit price>" (e.g. "66 x 666"), the item's price is qty * unit price, not the unit price alone.
+- If a line has "<qty> x <unit price>" (e.g. "66 x 666"), "qty" is that quantity and the item's "price" is qty * unit price (the line total), not the unit price alone.
+- If no quantity is shown for an item, "qty" is 1.
 - Numbers use "." or "," as thousands separators (e.g. "42.000" means 42000), not decimals, unless the value clearly has cents.
 - "tax" covers VAT/PPN/PB1. "service" covers service charge/svc. Use 0 if absent.
 - "total" is the grand total actually charged. If no explicit total line exists, sum the items, tax, and service.
@@ -26,7 +27,10 @@ function isValidParsedReceipt(value: unknown): value is ParsedReceipt {
         typeof i === "object" &&
         typeof (i as Record<string, unknown>).name === "string" &&
         typeof (i as Record<string, unknown>).price === "number" &&
-        Number.isFinite((i as Record<string, unknown>).price as number)
+        Number.isFinite((i as Record<string, unknown>).price as number) &&
+        (typeof (i as Record<string, unknown>).qty === "undefined" ||
+          (typeof (i as Record<string, unknown>).qty === "number" &&
+            Number.isFinite((i as Record<string, unknown>).qty as number)))
     )
   ) {
     return false;
@@ -101,7 +105,7 @@ export async function parseReceiptWithLlm(text: string): Promise<ParsedReceipt |
       console.error("[llmReceiptParser] response failed shape validation", JSON.stringify(parsed));
       return null;
     }
-    return parsed;
+    return { ...parsed, items: parsed.items.map((i) => ({ ...i, qty: i.qty ?? 1 })) };
   } catch (error) {
     console.error("[llmReceiptParser] threw", error instanceof Error ? error.message : error);
     return null;

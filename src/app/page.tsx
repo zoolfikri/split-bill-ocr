@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-type Item = { id: string; name: string; price: number; personIds: string[] };
+type Item = { id: string; name: string; price: number; qty: number; personIds: string[] };
 type Person = { id: string; name: string };
 type Step = "upload" | "review" | "people" | "assign";
 
@@ -106,7 +106,12 @@ export default function Home() {
       updateBill({
         step: "review",
         imageUrl: data.imageUrl,
-        items: data.items.map((i: { name: string; price: number }) => ({ ...i, id: uid(), personIds: [] })),
+        items: data.items.map((i: { name: string; price: number; qty?: number }) => ({
+          ...i,
+          qty: i.qty ?? 1,
+          id: uid(),
+          personIds: [],
+        })),
         tax: data.tax,
         service: data.service,
         total: data.total,
@@ -131,7 +136,7 @@ export default function Home() {
   }
 
   function addItem() {
-    updateBill({ items: [...items, { id: uid(), name: "", price: 0, personIds: [] }] });
+    updateBill({ items: [...items, { id: uid(), name: "", price: 0, qty: 1, personIds: [] }] });
   }
 
   function addPerson() {
@@ -327,9 +332,25 @@ export default function Home() {
                 </pre>
               </details>
             )}
+            <div className="flex gap-2 px-1 text-xs text-muted">
+              <span className="w-14 text-center">Qty</span>
+              <span className="flex-1">Item name</span>
+              <span className="w-24 text-right">Price</span>
+              <span className="w-11" />
+            </div>
             <div className="space-y-2">
               {items.map((item) => (
                 <div key={item.id} className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    step="1"
+                    aria-label="Quantity"
+                    className="font-ticket min-h-11 w-14 rounded-lg border border-border bg-surface px-2 py-2 text-center"
+                    value={item.qty}
+                    onChange={(e) => updateItem(item.id, { qty: parseInt(e.target.value, 10) || 1 })}
+                  />
                   <input
                     className="min-h-11 flex-1 rounded-lg border border-border bg-surface px-3 py-2"
                     value={item.name}
@@ -458,7 +479,10 @@ export default function Home() {
               {items.map((item) => (
                 <div key={item.id} className="rounded-xl border border-border bg-surface p-3">
                   <div className="flex items-baseline gap-2 font-medium">
-                    <span className="min-w-0 shrink break-words">{item.name || "(unnamed item)"}</span>
+                    <span className="min-w-0 shrink break-words">
+                      {item.qty > 1 && <span className="font-ticket text-muted">{item.qty}× </span>}
+                      {item.name || "(unnamed item)"}
+                    </span>
                     <span className="leader" />
                     <span className="font-ticket shrink-0">{item.price.toFixed(2)}</span>
                   </div>
