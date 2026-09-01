@@ -1,7 +1,7 @@
 import type { ParsedReceipt } from "@/lib/receiptParser";
 
 const API_URL = "https://9router.zool.asia/v1/chat/completions";
-const MODEL = "kr/glm-5";
+const MODEL = "zool/glm-5.3-flash";
 
 const SYSTEM_PROMPT = `You extract structured data from OCR text of a restaurant/cafe receipt.
 Return ONLY a JSON object, no prose, no markdown fences, matching exactly this shape:
@@ -78,7 +78,7 @@ export async function parseReceiptWithLlm(text: string): Promise<ParsedReceipt |
       },
       body: JSON.stringify({
         model: MODEL,
-        temperature: 0,
+        temperature: 0.01,
         stream: false,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
