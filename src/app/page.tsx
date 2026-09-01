@@ -332,27 +332,30 @@ export default function Home() {
                 </pre>
               </details>
             )}
-            <div className="flex gap-2 px-1 text-xs text-muted">
-              <span className="w-14 text-center">Qty</span>
-              <span className="flex-1">Item name</span>
-              <span className="w-24 text-right">Price</span>
-              <span className="w-11" />
+            <div className="grid grid-cols-[2.75rem_minmax(0,1fr)_4.5rem_2.75rem] gap-2 px-1 text-xs text-muted sm:grid-cols-[3rem_minmax(0,1fr)_5.5rem_2.75rem]">
+              <span className="text-center">Qty</span>
+              <span>Item name</span>
+              <span className="text-right">Price</span>
+              <span />
             </div>
             <div className="space-y-2">
               {items.map((item) => (
-                <div key={item.id} className="flex items-center gap-2">
+                <div
+                  key={item.id}
+                  className="grid grid-cols-[2.75rem_minmax(0,1fr)_4.5rem_2.75rem] items-center gap-2 sm:grid-cols-[3rem_minmax(0,1fr)_5.5rem_2.75rem]"
+                >
                   <input
                     type="number"
                     inputMode="numeric"
                     min={1}
                     step="1"
                     aria-label="Quantity"
-                    className="font-ticket min-h-11 w-14 rounded-lg border border-border bg-surface px-2 py-2 text-center"
+                    className="font-ticket min-h-11 min-w-0 rounded-lg border border-border bg-surface px-1 py-2 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     value={item.qty}
                     onChange={(e) => updateItem(item.id, { qty: parseInt(e.target.value, 10) || 1 })}
                   />
                   <input
-                    className="min-h-11 flex-1 rounded-lg border border-border bg-surface px-3 py-2"
+                    className="min-h-11 min-w-0 rounded-lg border border-border bg-surface px-3 py-2"
                     value={item.name}
                     onChange={(e) => updateItem(item.id, { name: e.target.value })}
                     placeholder="Item name"
@@ -361,7 +364,7 @@ export default function Home() {
                     type="number"
                     inputMode="decimal"
                     step="0.01"
-                    className="font-ticket min-h-11 w-24 rounded-lg border border-border bg-surface px-3 py-2 text-right"
+                    className="font-ticket min-h-11 min-w-0 rounded-lg border border-border bg-surface px-2 py-2 text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     value={item.price}
                     onChange={(e) => updateItem(item.id, { price: parseFloat(e.target.value) || 0 })}
                   />
