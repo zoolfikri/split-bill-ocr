@@ -59,12 +59,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: visionJson.responses[0].error.message }, { status: 502 });
     }
 
-    const llmParsed = await parseReceiptWithLlm(text);
-    const parsed = llmParsed ?? parseReceiptText(text);
+    const llmResult = await parseReceiptWithLlm(text);
+    const parsed = llmResult.parsed ?? parseReceiptText(text);
     return NextResponse.json({
       ...parsed,
       imageUrl: blob.url,
-      parsedBy: llmParsed ? "llm" : "regex",
+      parsedBy: llmResult.parsed ? "llm" : "regex",
+      llmError: llmResult.parsed ? undefined : llmResult.error,
       ocrText: text,
     });
   } catch (error: unknown) {

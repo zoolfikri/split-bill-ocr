@@ -16,6 +16,7 @@ type BillState = {
   total: number;
   people: Person[];
   parsedBy?: string;
+  llmError?: string;
   ocrText: string;
 };
 
@@ -31,6 +32,7 @@ const INITIAL_BILL: BillState = {
   total: 0,
   people: [],
   parsedBy: undefined,
+  llmError: undefined,
   ocrText: "",
 };
 
@@ -60,7 +62,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [newPersonName, setNewPersonName] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | undefined>();
-  const { step, imageUrl, items, tax, service, total, people, parsedBy, ocrText } = bill;
+  const { step, imageUrl, items, tax, service, total, people, parsedBy, llmError, ocrText } = bill;
 
   function updateBill(patch: Partial<BillState>) {
     setBill((prev) => ({ ...prev, ...patch }));
@@ -116,6 +118,7 @@ export default function Home() {
         service: data.service,
         total: data.total,
         parsedBy: data.parsedBy,
+        llmError: data.llmError,
         ocrText: data.ocrText ?? "",
       });
     } catch (e) {
@@ -322,6 +325,7 @@ export default function Home() {
             {parsedBy && (
               <p className="text-xs text-muted">
                 Parsed via {parsedBy === "llm" ? "AI (LLM)" : "regex fallback"}
+                {parsedBy === "regex" && llmError && ` — AI error: ${llmError}`}
               </p>
             )}
             {ocrText && (
