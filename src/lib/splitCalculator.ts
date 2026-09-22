@@ -1,4 +1,5 @@
-export type SplitItem = { id: string; name: string; price: number; personIds: string[] };
+export type SplitAssignment = { personId: string; units: number };
+export type SplitItem = { id: string; name: string; price: number; assignments: SplitAssignment[] };
 export type SplitPerson = { id: string; name: string };
 
 export type PersonTotal = {
@@ -29,11 +30,13 @@ export function calculateSplit(
   );
 
   for (const item of items) {
-    if (item.personIds.length === 0) continue;
-    const share = item.price / item.personIds.length;
-    for (const personId of item.personIds) {
+    if (item.assignments.length === 0) continue;
+    const totalUnits = item.assignments.reduce((sum, a) => sum + a.units, 0);
+    if (totalUnits <= 0) continue;
+    for (const { personId, units } of item.assignments) {
       const person = perPerson.get(personId);
       if (!person) continue;
+      const share = (item.price * units) / totalUnits;
       person.items.push({ name: item.name, share: round2(share) });
       person.subtotal += share;
     }

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { prisma } from "@/lib/prisma";
 
-type SaveItem = { name: string; price: number; qty: number; personIds: string[] };
+type SaveAssignment = { personId: string; units: number };
+type SaveItem = { name: string; price: number; qty: number; assignments: SaveAssignment[] };
 type SavePerson = { id: string; name: string };
 type SaveBody = {
   imageUrl?: string;
@@ -44,10 +45,9 @@ export async function POST(req: NextRequest) {
         price: item.price,
         qty: item.qty || 1,
         assignments: {
-          create: item.personIds
-            .map((clientId) => personIdByClientId.get(clientId))
-            .filter((id): id is string => Boolean(id))
-            .map((personId) => ({ personId })),
+          create: item.assignments
+            .map((a) => ({ personId: personIdByClientId.get(a.personId), units: a.units }))
+            .filter((a): a is { personId: string; units: number } => Boolean(a.personId)),
         },
       },
     });

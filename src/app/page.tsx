@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-type Item = { id: string; name: string; price: number; qty: number; personIds: string[] };
+type Assignment = { personId: string; units: number };
+type Item = { id: string; name: string; price: number; qty: number; assignments: Assignment[] };
 type Person = { id: string; name: string };
 type Step = "upload" | "review" | "people" | "assign";
 
@@ -112,7 +113,7 @@ export default function Home() {
           ...i,
           qty: i.qty ?? 1,
           id: uid(),
-          personIds: [],
+          assignments: [],
         })),
         tax: data.tax,
         service: data.service,
@@ -139,7 +140,7 @@ export default function Home() {
   }
 
   function addItem() {
-    updateBill({ items: [...items, { id: uid(), name: "", price: 0, qty: 1, personIds: [] }] });
+    updateBill({ items: [...items, { id: uid(), name: "", price: 0, qty: 1, assignments: [] }] });
   }
 
   function addPerson() {
@@ -152,7 +153,7 @@ export default function Home() {
   function removePerson(id: string) {
     updateBill({
       people: people.filter((p) => p.id !== id),
-      items: items.map((i) => ({ ...i, personIds: i.personIds.filter((pid) => pid !== id) })),
+      items: items.map((i) => ({ ...i, assignments: i.assignments.filter((a) => a.personId !== id) })),
     });
   }
 
@@ -162,9 +163,25 @@ export default function Home() {
         i.id === itemId
           ? {
               ...i,
-              personIds: i.personIds.includes(personId)
-                ? i.personIds.filter((id) => id !== personId)
-                : [...i.personIds, personId],
+              assignments: i.assignments.some((a) => a.personId === personId)
+                ? i.assignments.filter((a) => a.personId !== personId)
+                : [...i.assignments, { personId, units: 1 }],
+            }
+          : i
+      ),
+    });
+  }
+
+  function setAssignmentUnits(itemId: string, personId: string, units: number) {
+    const clamped = Math.max(1, Math.round(units) || 1);
+    updateBill({
+      items: items.map((i) =>
+        i.id === itemId
+          ? {
+              ...i,
+              assignments: i.assignments.map((a) =>
+                a.personId === personId ? { ...a, units: clamped } : a
+              ),
             }
           : i
       ),
@@ -191,7 +208,7 @@ export default function Home() {
   }
 
   const itemsSubtotal = items.reduce((sum, i) => sum + (Number(i.price) || 0), 0);
-  const unassignedCount = items.filter((i) => i.personIds.length === 0).length;
+  const unassignedCount = items.filter((i) => i.assignments.length === 0).length;
   const expectedTotal = itemsSubtotal + tax + service;
   const totalMismatch = Math.round((total - expectedTotal) * 100) / 100;
 
@@ -481,40 +498,61 @@ export default function Home() {
         {step === "assign" && (
           <div className="space-y-4">
             <h2 className="font-semibold">Who ordered what?</h2>
-            <p className="text-sm text-muted">Tap everyone who shared each item. Tax &amp; service split proportionally.</p>
+            <p className="text-sm text-muted">
+              Tap everyone who shared each item. Tax &amp; service split proportionally.
+            </p>
             <div className="space-y-3">
-              {items.map((item) => (
-                <div key={item.id} className="rounded-xl border border-border bg-surface p-3">
-                  <div className="flex items-baseline gap-2 font-medium">
-                    <span className="min-w-0 shrink break-words">
-                      {item.qty > 1 && <span className="font-ticket text-muted">{item.qty}× </span>}
-                      {item.name || "(unnamed item)"}
-                    </span>
-                    <span className="leader" />
-                    <span className="font-ticket shrink-0">{item.price.toFixed(2)}</span>
+              {items.map((item) => {
+                const assignedUnits = item.assignments.reduce((sum, a) => sum + a.units, 0);
+                return (
+                  <div key={item.id} className="rounded-xl border border-border bg-surface p-3">
+                    <div className="flex items-baseline gap-2 font-medium">
+                      <span className="min-w-0 shrink break-words">
+                        {item.qty > 1 && <span className="font-ticket text-muted">{item.qty}× </span>}
+                        {item.name || "(unnamed item)"}
+                      </span>
+                      <span className="leader" />
+                      <span className="font-ticket shrink-0">{item.price.toFixed(2)}</span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {people.map((p) => {
+                        const assignment = item.assignments.find((a) => a.personId === p.id);
+                        return (
+                          <div
+                            key={p.id}
+                            className={`flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm ${
+                              assignment ? "border-accent bg-accent text-accent-foreground" : "border-border"
+                            }`}
+                          >
+                            <button type="button" onClick={() => toggleAssignment(item.id, p.id)}>
+                              {p.name}
+                            </button>
+                            {assignment && item.qty > 1 && (
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                min={1}
+                                step="1"
+                                aria-label={`${p.name}'s share of ${item.name || "item"}`}
+                                className="font-ticket min-h-6 w-9 rounded-full border border-accent-foreground/30 bg-transparent px-1 text-center text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                value={assignment.units}
+                                onChange={(e) =>
+                                  setAssignmentUnits(item.id, p.id, parseInt(e.target.value, 10))
+                                }
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {item.qty > 1 && item.assignments.length > 0 && assignedUnits !== item.qty && (
+                      <p className="mt-1.5 text-xs text-amber-600">
+                        {assignedUnits} of {item.qty} units assigned
+                      </p>
+                    )}
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {people.map((p) => (
-                      <label
-                        key={p.id}
-                        className={`min-h-9 cursor-pointer rounded-full border px-3 py-1.5 text-sm ${
-                          item.personIds.includes(p.id)
-                            ? "border-accent bg-accent text-accent-foreground"
-                            : "border-border"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          className="hidden"
-                          checked={item.personIds.includes(p.id)}
-                          onChange={() => toggleAssignment(item.id, p.id)}
-                        />
-                        {p.name}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             {unassignedCount > 0 && (
               <p className="text-sm text-amber-600">{unassignedCount} item(s) have no one assigned and won&apos;t be charged to anyone.</p>

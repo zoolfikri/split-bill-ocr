@@ -18,7 +18,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     id: item.id,
     name: item.name,
     price: Number(item.price),
-    personIds: item.assignments.map((a) => a.personId),
+    assignments: item.assignments.map((a) => ({ personId: a.personId, units: a.units })),
   }));
 
   const totals = calculateSplit(items, bill.people, Number(bill.tax), Number(bill.service));

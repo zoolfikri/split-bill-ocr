@@ -1,0 +1,35 @@
+{
+  "action": "skip",
+  "clientASNDescription": "Amazon.com, Inc.",
+  "clientAsn": "14618",
+  "clientCountryName": "US",
+  "clientIP": "54.242.160.95",
+  "clientRefererHost": "",
+  "clientRequestHTTPHost": "9router.zool.asia",
+  "clientRequestHTTPMethodName": "POST",
+  "clientRequestHTTPProtocol": "HTTP/1.1",
+  "clientRequestPath": "/v1/chat/completions",
+  "clientRequestQuery": "",
+  "contentScanObjTypes": [],
+  "datetime": "2026-09-22T09:25:46Z",
+  "description": "Allow 9Router API",
+  "matchIndex": 0,
+  "metadata": [
+    {
+      "key": "ruleset_version",
+      "value": "1"
+    },
+    {
+      "key": "version",
+      "value": "1"
+    }
+  ],
+  "rayName": "a3f043a38e02d6dd",
+  "ref": "",
+  "ruleId": "e9f54a0be34b43c9974837a92930b388",
+  "rulesetId": "5cf8e8b6240f46148fff642bead3a507",
+  "sampleInterval": 1,
+  "source": "firewallCustom",
+  "userAgent": "node",
+  "zoneVersion": 0
+}

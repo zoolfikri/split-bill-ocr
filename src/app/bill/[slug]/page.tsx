@@ -21,7 +21,7 @@ export default async function BillPage({ params }: { params: Promise<{ slug: str
     name: item.name,
     price: Number(item.price),
     qty: item.qty,
-    personIds: item.assignments.map((a) => a.personId),
+    assignments: item.assignments.map((a) => ({ personId: a.personId, units: a.units })),
   }));
 
   const tax = Number(bill.tax);
