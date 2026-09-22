@@ -1,7 +1,5 @@
 import type { ParsedReceipt } from "@/lib/receiptParser";
 
-const API_URL = "https://9router.zool.asia/v1/chat/completions";
-
 const SYSTEM_PROMPT = `You extract structured data from OCR text of a restaurant/cafe receipt.
 Return ONLY a JSON object, no prose, no markdown fences, matching exactly this shape:
 {"items": [{"name": string, "price": number, "qty": number}], "tax": number, "service": number, "total": number}
@@ -64,9 +62,10 @@ export async function parseReceiptWithLlm(
 ): Promise<LlmParseResult> {
 	const apiKey = process.env.NINE_ROUTER_API_KEY;
 	const model = process.env.NINE_ROUTER_MODEL;
-	if (!apiKey || !model) {
+	const baseUrl = process.env.NINE_ROUTER_BASE_URL;
+	if (!apiKey || !model || !baseUrl) {
 		console.warn(
-			"[llmReceiptParser] NINE_ROUTER_API_KEY or NINE_ROUTER_MODEL not set, skipping LLM parse",
+			"[llmReceiptParser] NINE_ROUTER_API_KEY, NINE_ROUTER_MODEL, or NINE_ROUTER_BASE_URL not set, skipping LLM parse",
 		);
 		return { parsed: null, error: "AI parsing not configured" };
 	}
@@ -76,7 +75,7 @@ export async function parseReceiptWithLlm(
 		const controller = new AbortController();
 		const timeout = setTimeout(() => controller.abort(), 20_000);
 
-		const res = await fetch(API_URL, {
+		const res = await fetch(`${baseUrl}/chat/completions`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
