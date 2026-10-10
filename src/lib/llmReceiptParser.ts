@@ -73,7 +73,7 @@ export async function parseReceiptWithLlm(
 
 	try {
 		const controller = new AbortController();
-		const timeout = setTimeout(() => controller.abort(), 20_000);
+		const timeout = setTimeout(() => controller.abort(), 50_000);
 
 		const res = await fetch(`${baseUrl}/chat/completions`, {
 			method: "POST",
@@ -129,7 +129,7 @@ export async function parseReceiptWithLlm(
 		const message = error instanceof Error ? error.message : String(error);
 		console.error("[llmReceiptParser] threw", message);
 		const reason =
-			message === "The user aborted a request."
+			error instanceof Error && error.name === "AbortError"
 				? "AI request timed out"
 				: message;
 		return { parsed: null, error: reason };
