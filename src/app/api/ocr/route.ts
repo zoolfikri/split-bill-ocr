@@ -6,6 +6,9 @@ import { consumeDailyOcrQuota, DAILY_OCR_LIMIT } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
+// OCR + LLM parsing can exceed the default function timeout.
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   const quota = await consumeDailyOcrQuota();
   if (!quota.allowed) {
