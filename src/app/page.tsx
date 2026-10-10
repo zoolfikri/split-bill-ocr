@@ -95,6 +95,23 @@ export default function Home() {
     setError("");
   }
 
+  // Vercel rejects request bodies over 4.5MB, so downscale phone photos first.
+  async function compressImage(file: File): Promise<Blob> {
+    if (file.size < 1_500_000 || !file.type.startsWith("image/")) return file;
+    try {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.85));
+      return blob ?? file;
+    } catch {
+      return file;
+    }
+  }
+
   async function handleUpload(file: File) {
     setLoading(true);
     setError("");
@@ -102,9 +119,17 @@ export default function Home() {
     setPreviewUrl(objectUrl);
     try {
       const form = new FormData();
-      form.append("file", file);
+      form.append("file", await compressImage(file), file.name);
       const res = await fetch("/api/ocr", { method: "POST", body: form });
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(
+          res.status === 413 ? "Image too large, try a smaller photo" : text || "OCR failed",
+        );
+      }
       if (!res.ok) throw new Error(data.error ?? "OCR failed");
       updateBill({
         step: "review",
