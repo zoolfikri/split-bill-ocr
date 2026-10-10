@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { formatMoney } from "@/lib/format";
 
 type Assignment = { personId: string; units: number };
 type Item = { id: string; name: string; price: number; qty: number; assignments: Assignment[] };
@@ -469,13 +470,13 @@ export default function Home() {
             <p className="flex items-baseline gap-2 text-sm text-muted">
               Items subtotal
               <span className="leader" />
-              <span className="font-ticket text-foreground">{itemsSubtotal.toFixed(2)}</span>
+              <span className="font-ticket text-foreground">{formatMoney(itemsSubtotal)}</span>
             </p>
 
             {Math.abs(totalMismatch) > 0.01 && (
               <p className="rounded-lg bg-amber-100 p-3 text-sm text-amber-800">
-                Items + tax + service ({expectedTotal.toFixed(2)}) doesn&apos;t match the total ({total.toFixed(2)}) —
-                off by {Math.abs(totalMismatch).toFixed(2)}. Check for a missing/extra item, a misread price, or
+                Items + tax + service ({formatMoney(expectedTotal)}) doesn&apos;t match the total ({formatMoney(total)}) —
+                off by {formatMoney(Math.abs(totalMismatch))}. Check for a missing/extra item, a misread price, or
                 another charge (e.g. discount, delivery fee) not reflected above.
               </p>
             )}
@@ -537,7 +538,7 @@ export default function Home() {
                         {item.name || "(unnamed item)"}
                       </span>
                       <span className="leader" />
-                      <span className="font-ticket shrink-0">{item.price.toFixed(2)}</span>
+                      <span className="font-ticket shrink-0">{formatMoney(item.price)}</span>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {people.map((p) => {

@@ -1,10 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { calculateSplit } from "@/lib/splitCalculator";
-
-// "10.000" not "10000.00" — Indonesian Rupiah has no cents, and uses "." as the
-// thousands separator.
-const formatMoney = (n: number) => new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 }).format(n);
+import { formatMoney } from "@/lib/format";
 
 export default async function BillPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -109,6 +106,21 @@ export default async function BillPage({ params }: { params: Promise<{ slug: str
           <div className="torn-edge torn-edge-bottom" />
         </div>
       </section>
+
+      {bill.imageUrl && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-medium text-muted">Original receipt</h2>
+          <a href={`/api/bills/${slug}/image`} target="_blank" rel="noopener noreferrer" className="block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`/api/bills/${slug}/image`}
+              alt="Original receipt photo"
+              className="w-full rounded-xl border border-border"
+            />
+          </a>
+          <p className="text-center text-xs text-muted">Tap to open full size</p>
+        </section>
+      )}
     </main>
   );
 }
